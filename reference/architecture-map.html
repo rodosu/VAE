@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>速查 · 架构地图 — VAE 手写课程</title>
+<link rel="stylesheet" href="../assets/course.css">
+<style>
+  .big-tree { font-size: .82rem; }
+  .legend { font-family: var(--sans); font-size: .82rem; color: var(--muted); margin: -.6rem 0 1.4rem; }
+</style>
+</head>
+<body>
+
+<div class="kicker">Reference · 01</div>
+<h1>架构地图：vae.py 拆到哪、各管什么</h1>
+<div class="meta">速查表 · 每课动笔前回来对号入座 · <a href="../lessons/0001-architecture-map.html">配套第 1 课</a></div>
+
+<h2>一、一条流水线（心智模型）</h2>
+<p>整个项目是一条流水线。<strong>启动脚本是总装指挥</strong>：它从设置清单取数字，从各车间领零件，拼成一次训练。零件之间只靠"你递给我什么、我递回给你什么"（函数的输入和返回值）打交道。</p>
+<div class="pipeline">
+  <div class="stage"><span class="st">设置清单</span>数字与路径<span class="from">三个 yaml 小文件</span></div>
+  <div class="stage"><span class="st">备料</span>图片 → 干净的递图助手<span class="from">src/data/</span></div>
+  <div class="stage"><span class="st">加工</span>小零件 → 整机模型<span class="from">src/models/</span></div>
+  <div class="stage"><span class="st">工具箱</span>扣分、存档、固定随机<span class="from">src/utils/</span></div>
+  <div class="stage"><span class="st">总装</span>领零件、拼成训练<span class="from">src/train/（只指挥、不造零件）</span></div>
+</div>
+
+<div class="callout rule">
+  <span class="tag">三条铁律（两个范本的共同点）</span>
+  ① <strong>启动脚本只指挥、不造零件</strong>——范本一的启动脚本只有 4 行，模型结构一行都不写在里面；<br>
+  ② <strong>一个文件只管一件事</strong>——模型文件只跟数字打交道，数据文件只管读图，扣分文件只算分；<br>
+  ③ <strong>会调的数字都住进设置清单</strong>——代码里不出现 1024、0.0002 这类"魔法数字"，想改就改清单。
+</div>
+
+<h2>二、两个范本怎么拆（我们抄什么）</h2>
+<table>
+  <thead>
+    <tr><th>维度</th><th>范本一：BBdiffusion-FC</th><th>范本二：brain-net-diffusion</th><th>VAE 项目取谁</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>目录骨架</td>
+      <td><code>configs/ + src/{models,train,utils}</code></td>
+      <td><code>configs/ + src/{data,models,utils,train.py,eval.py}</code></td>
+      <td>两者交集：多取一间"备料屋" <code>src/data/</code></td>
+    </tr>
+    <tr>
+      <td>设置清单怎么分</td>
+      <td>分三摞：<code>data/ model/ trainer/</code></td>
+      <td>分七八摞（callbacks/logger/trainer/debug…）</td>
+      <td>学范本一的三分法：<code>data/ model/ train/</code></td>
+    </tr>
+    <tr>
+      <td>模型内部</td>
+      <td>模型、数据集、训练循环挤在同一个 <code>ae.py</code></td>
+      <td>小零件住 <code>models/components/</code>，整机另住一屋</td>
+      <td>学范本二的分法：<code>components/conv_blocks.py</code>（零件）+ <code>vae.py</code>（整机）</td>
+    </tr>
+    <tr>
+      <td>清单怎么读</td>
+      <td>手写：先给参数设默认值，再用清单里的数字覆盖（ae.py 的 apply_config，第 292 行）</td>
+      <td>用现成框架全自动完成</td>
+      <td>学范本一的手写法（不碰那个框架）</td>
+    </tr>
+    <tr>
+      <td>训练循环</td>
+      <td>自己写 for 循环（ae.py 的 main 函数）</td>
+      <td>一行 <code>Trainer.fit()</code> 全托管</td>
+      <td>自己写——亲手写出这个循环正是本课目标</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>三、目标目录树（认领表）</h2>
+<p class="legend">每个文件认领原始 vae.py 的一段行号（行号指仓库根下未改动的 <code>vae.py</code>）。灰色是文件夹。</p>
+<pre class="big-tree"><code>VAE/
+├── <span class="cmt">configs/                        # 设置清单：只有数字与路径，没有代码</span>
+│   ├── data/
+│   │   └── celeba.yaml           <span class="ann">← 认领第12、23行：图片在哪(data_root)、裁多大(image_size)</span>
+│   ├── model/
+│   │   └── vae.yaml              <span class="ann">← 认领第20、58行：latent_dim(浓缩精华多长), ch(零件粗细)</span>
+│   └── train/
+│       └── default.yaml          <span class="ann">← 认领第13–22行：存哪、每次几张图、学多快、
+│                                    训练多少轮、隔几轮出图</span>
+├── <span class="cmt">src/</span>
+│   ├── __init__.py
+│   ├── data/
+│   │   ├── __init__.py
+│   │   └── celeba.py             <span class="ann">← 认领第26–53行：裁图规矩 + 数据集 + 递图助手
+│                                    （新加一个 build_dataloader 函数，见术语表"工厂函数"）</span>
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── components/
+│   │   │   ├── __init__.py
+│   │   │   └── conv_blocks.py    <span class="ann">← 认领第65–77、89–101行：压缩零件、还原零件
+│                                    （纯看图结构，不含 VAE 的特殊概念）</span>
+│   │   └── vae.py                <span class="ann">← 认领第57–64、79–86、103–125行：把零件拼成完整 VAE
+│                                    + 三个"接头"小层 + 重参数化技巧</span>
+│   ├── train/
+│   │   ├── __init__.py
+│   │   └── train_vae.py          <span class="ann">← 认领第11–24、152–211行：读清单 → 领零件 →
+│                                    训练循环 → 存档出图 + 启动入口</span>
+│   └── utils/
+│       ├── __init__.py
+│       ├── losses.py             <span class="ann">← 认领第129–133行：算扣分（还原差多少 + 一项正则）</span>
+│       ├── checkpoint.py         <span class="ann">← 认领第137–148行：存档、拼图保存</span>
+│       └── seed.py               <span class="ann">← 新增：固定随机性（照抄范本一 ae.py 第29–36行）</span>
+└── vae.py                        <span class="cmt"># 原始大文件，保留不动，当对照</span></code></pre>
+
+<h2>四、逐文件职责卡片</h2>
+<table>
+  <thead>
+    <tr><th>目标文件</th><th>给它什么 → 它还你什么</th><th>只管的一件事</th><th>禁止事项</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>configs/*.yaml</code></td>
+      <td>— → 数字、路径</td>
+      <td>存放所有"以后想调"的数字与路径，按数据/模型/训练分三摞</td>
+      <td>不出现任何 Python 代码</td>
+    </tr>
+    <tr>
+      <td><code>src/data/celeba.py</code></td>
+      <td>图片文件夹 → 递图助手</td>
+      <td>读图、裁图、最后交出一个"每次能递一小把图"的助手</td>
+      <td>不定义模型、不写训练逻辑</td>
+    </tr>
+    <tr>
+      <td><code>src/models/components/conv_blocks.py</code></td>
+      <td>数字格子 → 数字格子</td>
+      <td>压缩零件（把图一步步变小变厚）、还原零件（原路放大回去）</td>
+      <td>不出现 mu、logvar、z 这些 VAE 特有概念（第 3 课才登场）</td>
+    </tr>
+    <tr>
+      <td><code>src/models/vae.py</code></td>
+      <td>图片 → (还原的图, 两个小账本)</td>
+      <td>用零件拼出完整 VAE：压缩→取精华→还原，一条龙</td>
+      <td>不读数据、不算扣分、不管"怎么学"（优化器的事）</td>
+    </tr>
+    <tr>
+      <td><code>src/utils/losses.py</code></td>
+      <td>(还原图, 原图, 两个小账本) → 扣分数字</td>
+      <td>算"这次还原得多差"</td>
+      <td>不含任何模型零件</td>
+    </tr>
+    <tr>
+      <td><code>src/utils/checkpoint.py</code></td>
+      <td>模型 → 磁盘文件</td>
+      <td>存档（存模型的数字）、把一批图拼成一张大图保存</td>
+      <td>不改动模型</td>
+    </tr>
+    <tr>
+      <td><code>src/utils/seed.py</code></td>
+      <td>一个整数 → 无</td>
+      <td>固定所有随机源头，让实验可复现</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code>src/train/train_vae.py</code></td>
+      <td>一条命令 → 训练好的存档</td>
+      <td>读清单 → 领零件 → 训练循环 → 存档出图</td>
+      <td>不定义任何模型结构（只组装）</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>五、总装指挥的骨架（第 6 课要写的 main 函数）</h2>
+<p>所有零件在 main 函数里按固定顺序会合——这个顺序就是上面流水线的顺序：</p>
+<pre><code><span class="cmt"># src/train/train_vae.py 的 main() 骨架（第 6 课才写，先混个脸熟）</span>
+def main(args):
+    cfg = apply_config(args)                      <span class="cmt"># ① 取图纸：用清单里的数字盖掉默认值（学范本一 ae.py）</span>
+    set_seed(cfg[<span class="hl">"seed"</span>])                            <span class="cmt"># ② 固定随机性</span>
+    device = torch.device(<span class="hl">"cuda"</span> <span class="hl">if</span> torch.cuda.is_available() <span class="hl">else</span> <span class="hl">"cpu"</span>)
+    loader = build_dataloader(cfg)                <span class="cmt"># ③ 备料：从 src/data 领递图助手</span>
+    model = ConvVAE(latent_dim=…, image_size=…).to(device)   <span class="cmt"># ④ 加工：从 src/models 领整机</span>
+    optim = torch.optim.Adam(model.parameters(), lr=cfg[<span class="hl">"lr"</span>])  <span class="cmt"># 优化器：照扣分调数字的工具</span>
+    <span class="hl">for</span> epoch <span class="hl">in</span> range(1, cfg[<span class="hl">"num_epochs"</span>] + 1):     <span class="cmt"># ⑤ 循环：清空旧账 → 过模型 → 算扣分 → 回传 → 调数字</span>
+        ...
+        loss, recon, kld = vae_loss(recon_x, x, mu, logvar)  <span class="cmt"># 扣分：从 src/utils 领</span>
+        save_checkpoint(model, optim, epoch, path)           <span class="cmt"># 存档：从 src/utils 领</span></code></pre>
+
+<h2>六、术语表（大白话词典）</h2>
+<table>
+  <thead><tr><th>词</th><th>大白话</th><th>本项目的实例</th></tr></thead>
+  <tbody>
+    <tr><td>模型</td><td>肚子里有几十万可调数字的程序；训练就是调这些数字</td><td><code>ConvVAE</code></td></tr>
+    <tr><td>训练</td><td>看图→算差多少→微调数字，循环几万次</td><td>main 里的 for 循环</td></tr>
+    <tr><td>层（layer）</td><td>模型里的一个"加工步骤"，数字进去、数字出来</td><td><code>nn.Conv2d</code>、<code>nn.Linear</code></td></tr>
+    <tr><td>卷积层</td><td>"看图找特征"的基本层；第 2 课手写</td><td>压缩/还原零件里的每一级台阶</td></tr>
+    <tr><td>数据集（Dataset）</td><td>图片文件夹 + "怎么读一张图"的规矩</td><td><code>CelebADataset</code></td></tr>
+    <tr><td>递图助手（DataLoader）</td><td>每次抽一小把图递给模型</td><td><code>build_dataloader()</code> 造出来的东西</td></tr>
+    <tr><td>裁图规矩（transform）</td><td>统一"裁多大、数值化到 0–1"的预处理步骤</td><td>原 vae.py 第 26–30 行</td></tr>
+    <tr><td>损失 / 扣分（loss）</td><td>量化"这次错得多差"的一个数字</td><td><code>vae_loss()</code></td></tr>
+    <tr><td>优化器</td><td>照着扣分自动微调模型数字的工具</td><td><code>torch.optim.Adam</code></td></tr>
+    <tr><td>存档（checkpoint）</td><td>把模型数字存成文件，像游戏存档</td><td><code>save_checkpoint()</code></td></tr>
+    <tr><td>state_dict</td><td>模型全部数字的清单，存档的本体</td><td><code>model.state_dict()</code></td></tr>
+    <tr><td>yaml / 设置清单</td><td>记参数的文本格式，长成 <code>batch_size: 1024</code></td><td><code>configs/train/default.yaml</code></td></tr>
+    <tr><td>argparse</td><td>Python 自带的"从命令行读参数"工具</td><td>第 6 课的 <code>build_argparser()</code></td></tr>
+    <tr><td>启动脚本 / 入口</td><td>用 python 命令直接运行的那个脚本；它很短，只负责指挥开工</td><td><code>src/train/train_vae.py</code></td></tr>
+    <tr><td>零件 / 积木</td><td>能被多个模型复用的独立小结构</td><td><code>models/components/conv_blocks.py</code></td></tr>
+    <tr><td>整机</td><td>把零件拼成可从头用到尾的完整模型</td><td><code>models/vae.py</code> 的 ConvVAE</td></tr>
+    <tr><td>工厂函数</td><td>吃一张设置清单、吐一个造好的东西的函数，让指挥不用知道细节</td><td><code>build_dataloader(cfg)</code></td></tr>
+    <tr><td>forward</td><td>模型"被使用"时执行的函数：描述数字怎么流过它</td><td>ConvVAE 的 <code>forward()</code></td></tr>
+    <tr><td>冒烟测试</td><td>用极小规模（几张图、一轮）跑通全流程，只验证管道没接错</td><td>第 7 课</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  维护：随课程推进更新 · 范本：<code>I:\Projects\BBdiffusion-FC\BBdiffusion-FC</code> 与 <code>I:\Projects\brain-net-diffusion</code> · 有疑问回对话里问老师
+</footer>
+
+</body>
+</html>

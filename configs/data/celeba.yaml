@@ -1,0 +1,3 @@
+#数据清单
+data_root: /home/rodosu/projects/VAE/faces/img_align_celeba
+image_size: 64
