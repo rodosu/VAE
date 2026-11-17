@@ -7,40 +7,35 @@
     save_dir/ 下：vae_epochN.pth（存档）、recon_epochN.png（重建对比）、sample_epochN.png（凭空生成）
 
 ## 项目结构
-    VAE/
+
+```text
+VAE/
 ├── configs/                        # 设置清单：只有数字与路径，没有代码
 │   ├── data/
 │   │   └── celeba.yaml           ← 图片在哪(data_root)、裁多大(image_size)
 │   ├── model/
 │   │   └── vae.yaml              ← latent_dim(浓缩精华多长), ch(零件粗细)
 │   └── train/
-│       └── default.yaml          ← 存哪、每次几张图、学多快、训练多少轮、隔几轮出图
-│                                 
+│       ├── default.yaml          ← 存哪、每次几张图、学多快、训练多少轮、隔几轮出图
+│       └── smoke.yaml            ← 冒烟清单：1 轮小批（换清单=换实验）
 ├── src/
-│   ├── __init__.py
 │   ├── data/
-│   │   ├── __init__.py
 │   │   └── celeba.py             ← 裁图规矩 + 数据集 + 递图助手
-│                                    （新加一个 build_dataloader 函数，见术语表"工厂函数"）
+│   │                                （工厂函数 build_dataloader：清单进、助手出）
 │   ├── models/
-│   │   ├── __init__.py
 │   │   ├── components/
-│   │   │   ├── __init__.py
-│   │   │   └── conv_blocks.py    ← 压缩零件、还原零件（纯看图结构，不含 VAE 的特殊概念）
-│                                    
-│   │   └── vae.py                ← 把零件拼成完整 VAE + 三个"接头"小层 + 重参数化技巧
-│                                    
+│   │   │   └── conv_blocks.py    ← 压缩零件、还原零件（纯看图结构，不含 VAE 特殊概念）
+│   │   └── vae.py                ← 把零件拼成完整 VAE + 三个"接头" + 重参数化
+│   ├── inference/
+│   │   └── generate.py           ← 部署车间：装存档 → 凭空生成 / 重建任意一张图
 │   ├── train/
-│   │   ├── __init__.py
 │   │   └── train_vae.py          ← 读清单 → 领零件 → 训练循环 → 存档出图 + 启动入口
-│                                    
 │   └── utils/
-│       ├── __init__.py
 │       ├── losses.py             ← 算扣分（还原差多少 + 一项正则）
 │       ├── checkpoint.py         ← 存档、拼图保存
-│       └── seed.py               ← 新增：固定随机性
+│       └── seed.py               ← 固定随机性（实验可复现）
 └── vae.py                        # 原始大文件，保留不动，当对照
-
+```
 
 
 我们从“如果不固定会怎样”讲起。
