@@ -3,7 +3,7 @@ save_dir: ./vae_test_checkpoints
 batch_size: 1024
 lr: 2.0e-4
 num_epochs: 300
-sample_every: 5 ## 每隔几轮存档、出图
+sample_every: 20  ## 每隔几轮存档、出图
 num_sample_images: 8
 num_workers: 8
 seed: 42
